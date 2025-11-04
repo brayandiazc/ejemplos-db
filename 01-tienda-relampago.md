@@ -45,13 +45,13 @@ CREATE TABLE clientes (doc TEXT, nombre TEXT, telefono TEXT, ciudad TEXT );
 **Qué harás:** ingresar filas con errores o formatos distintos.
 
 ```sql
-INSERT INTO productos VALUES ('A-01','Café molido 500g','12,5 USD','50u','alimentos');
-INSERT INTO productos VALUES ('B-99','Taza cerámica','18.000','','hogar');
-INSERT INTO productos VALUES ('X-7','Filtro papel #2','3.5','100',NULL);
+INSERT INTO productos (codigo,nombre,precio,stock,categoria) VALUES ('A-01','Café molido 500g','12,5 USD','50u','alimentos');
+INSERT INTO productos (codigo,nombre,precio,stock,categoria) VALUES ('B-99','Taza cerámica','18.000','','hogar');
+INSERT INTO productos (codigo,nombre,precio,stock,categoria) VALUES ('X-7','Filtro papel #2','3.5','100',NULL);
 
-INSERT INTO ventas VALUES ('2025/10/01','A-01','2','??');
-INSERT INTO ventas VALUES ('ayer','B-99','-1','0');
-INSERT INTO ventas VALUES ('01-10-25','X-7','10','35');
+INSERT INTO ventas (fecha,producto_codigo,cantidad,total) VALUES ('2025/10/01','A-01','2','??');
+INSERT INTO ventas (fecha,producto_codigo,cantidad,total) VALUES ('ayer','B-99','-1','0');
+INSERT INTO ventas (fecha,producto_codigo,cantidad,total) VALUES ('01-10-25','X-7','10','35');
 
 INSERT INTO clientes VALUES ('CC123','Ana Pérez','(57) 300-abc-9999','Bogota');
 INSERT INTO clientes VALUES ('correo@ejemplo','Luis Mora','3001234567','');
