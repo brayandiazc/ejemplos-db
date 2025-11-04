@@ -26,27 +26,11 @@ Un mensaje como `You are now connected to database "tienda_relampago"`.
 **Qué harás:** crear tres tablas sin validaciones, todo tipo `TEXT` (sirve para cargar datos imperfectos).
 
 ```sql
-CREATE TABLE productos (
-  codigo TEXT,
-  nombre TEXT,
-  precio TEXT,
-  stock TEXT,
-  categoria TEXT
-);
+CREATE TABLE productos (codigo TEXT, nombre TEXT, precio TEXT, stock TEXT, categoria TEXT);
 
-CREATE TABLE ventas (
-  fecha TEXT,
-  producto_codigo TEXT,
-  cantidad TEXT,
-  total TEXT
-);
+CREATE TABLE ventas (fecha TEXT, producto_codigo TEXT, cantidad TEXT, total TEXT);
 
-CREATE TABLE clientes (
-  doc TEXT,
-  nombre TEXT,
-  telefono TEXT,
-  ciudad TEXT
-);
+CREATE TABLE clientes (doc TEXT, nombre TEXT, telefono TEXT, ciudad TEXT );
 
 \dt
 ```
@@ -175,9 +159,7 @@ Ahora PostgreSQL no dejará insertar valores inválidos (por ejemplo, precios ne
 ALTER TABLE productos ADD CONSTRAINT productos_pkey PRIMARY KEY (codigo);
 ALTER TABLE ventas ADD COLUMN id BIGSERIAL;
 ALTER TABLE ventas ADD CONSTRAINT ventas_pkey PRIMARY KEY (id);
-ALTER TABLE ventas ADD CONSTRAINT ventas_producto_fk
-  FOREIGN KEY (producto_codigo) REFERENCES productos(codigo)
-  ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE ventas ADD CONSTRAINT ventas_producto_fk FOREIGN KEY (producto_codigo) REFERENCES productos(codigo) ON UPDATE CASCADE ON DELETE RESTRICT;
 ```
 
 **Explicación:**
@@ -191,27 +173,13 @@ ALTER TABLE ventas ADD CONSTRAINT ventas_producto_fk
 ### Ver todas las ventas con nombre del producto
 
 ```sql
-SELECT v.id,
-       v.fecha,
-       v.producto_codigo,
-       p.nombre AS producto,
-       v.cantidad,
-       p.precio,
-       (v.cantidad * p.precio)::NUMERIC(12,2) AS total_calculado
-FROM ventas v
-JOIN productos p ON p.codigo = v.producto_codigo
-ORDER BY v.fecha, v.id;
+SELECT v.id, v.fecha, v.producto_codigo, p.nombre AS producto, v.cantidad, p.precio, (v.cantidad * p.precio)::NUMERIC(12,2) AS total_calculado FROM ventas v JOIN productos p ON p.codigo = v.producto_codigo ORDER BY v.fecha, v.id;
 ```
 
 ### Ver total vendido por producto
 
 ```sql
-SELECT p.nombre,
-       SUM(v.cantidad * p.precio)::NUMERIC(12,2) AS total_vendido
-FROM ventas v
-JOIN productos p ON p.codigo = v.producto_codigo
-GROUP BY p.nombre
-ORDER BY total_vendido DESC;
+SELECT p.nombre, SUM(v.cantidad * p.precio)::NUMERIC(12,2) AS total_vendido FROM ventas v JOIN productos p ON p.codigo = v.producto_codigo GROUP BY p.nombre ORDER BY total_vendido DESC;
 ```
 
 **Explicación:**
