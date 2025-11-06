@@ -1,6 +1,6 @@
-# Proyecto 2 — Inscripciones a Cursos (PostgreSQL)
+# Proyecto 2 — Inscripciones a Cursos
 
-## 0) ¿Qué vamos a construir?
+## ¿Qué vamos a construir?
 
 - **estudiantes**: personas que toman cursos.
 - **cursos**: cada curso ofrecido (título, modalidad, fechas, etc.).
@@ -22,7 +22,7 @@
   - `TIMESTAMP`: fecha y hora (sin zona horaria).
   - `BIGSERIAL`: entero grande auto-incremental (se usa mucho para `id`).
 
-## 1) Conectarte y crear la base
+## Paso 1 Conectarte y crear la base
 
 **¿Qué hace cada comando?**
 
@@ -41,7 +41,7 @@ CREATE DATABASE academia;
 
 **Cómo verifico que funcionó:** el prompt de `psql` debe mostrar `academia=#`.
 
-## 2) Crear la tabla `estudiantes`
+## Paso 2 Crear la tabla `estudiantes`
 
 **Qué representa cada columna y restricción:**
 
@@ -71,7 +71,7 @@ CREATE TABLE estudiantes (
 
 **Cómo veo la estructura después de crearla:** `\d estudiantes`
 
-## 3) Crear la tabla `cursos`
+## Paso 3 Crear la tabla `cursos`
 
 **Puntos clave:**
 
@@ -98,7 +98,7 @@ CREATE TABLE cursos (
 - `modalidad='híbrido'` → falla por `CHECK`.
 - `fecha_fin < fecha_inicio` → falla por `CHECK`.
 
-## 4) Crear la tabla `inscripciones`
+## Paso 4 Crear la tabla `inscripciones`
 
 **Por qué existe esta tabla:** un estudiante puede tomar muchos cursos y un curso puede tener muchos estudiantes. `inscripciones` “conecta” ambos lados.
 
@@ -126,7 +126,7 @@ CREATE TABLE inscripciones (
 - Usar un `estudiante_id` que no existe → falla por FK.
 - Repetir la misma pareja `(estudiante_id, curso_id)` → falla por `UNIQUE`.
 
-## 5) Insertar datos de ejemplo
+## Paso 5 Insertar datos de ejemplo
 
 **¿Por qué insertar así?** Para practicar:
 
@@ -158,7 +158,7 @@ INSERT INTO inscripciones (estudiante_id,curso_id,estado) VALUES
 - `SELECT id, nombre FROM estudiantes;`
 - `SELECT id, titulo FROM cursos;`
 
-## 6) Consultas básicas (leer y combinar datos)
+## Paso 6 Consultas básicas (leer y combinar datos)
 
 **Listar estudiantes por nombre (A-Z):**
 
@@ -204,7 +204,7 @@ GROUP BY c.titulo
 ORDER BY total_inscritos DESC;
 ```
 
-## 7) Probar las restricciones (errores que deben ocurrir)
+## Paso 7 Probar las restricciones (errores que deben ocurrir)
 
 **Para entender que la base “se cuida sola”:**
 
@@ -228,13 +228,13 @@ VALUES (1,999,'pagada');
 - “new row for relation … violates check constraint …” (por `CHECK`)
 - “insert or update on table … violates foreign key constraint …” (por `FK`)
 
-## 8) Trucos básicos de consola
+## Paso 8 Trucos básicos de consola
 
 - Listar tablas: `\dt`
 - Ver estructura de una tabla: `\d nombre_tabla` (ej. `\d cursos`)
 - Salir de `psql`: `\q`
 
-## 9) Resumen de diseño (para tu mapa mental)
+## Paso 9 Resumen de diseño
 
 - **Relación:** `estudiantes (1) — (N) inscripciones (N) — (1) cursos`
 - **Reglas clave:**
@@ -244,7 +244,7 @@ VALUES (1,999,'pagada');
   - Una inscripción por estudiante y curso.
   - FKs mantienen la integridad entre tablas.
 
-## 10) Buenas prácticas mínimas (sin complicar)
+## Paso 10 Buenas prácticas mínimas
 
 - Usa `BIGSERIAL` para IDs (simple y funciona).
 - Define `NOT NULL`, `UNIQUE` y `CHECK` donde tenga sentido.
