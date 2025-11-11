@@ -228,26 +228,314 @@ VALUES (1,999,'pagada');
 - “new row for relation … violates check constraint …” (por `CHECK`)
 - “insert or update on table … violates foreign key constraint …” (por `FK`)
 
-## Paso 8 Trucos básicos de consola
+## Paso 8 Actualizar información existente (UPDATE)
 
-- Listar tablas: `\dt`
-- Ver estructura de una tabla: `\d nombre_tabla` (ej. `\d cursos`)
-- Salir de `psql`: `\q`
+**Cambiar datos puntuales de una fila:**
 
-## Paso 9 Resumen de diseño
+```sql
+-- Cambiar el email de una persona
+UPDATE estudiantes
+SET email = 'ana.perez@ejemplo.com'
+WHERE id = 1;
 
-- **Relación:** `estudiantes (1) — (N) inscripciones (N) — (1) cursos`
-- **Reglas clave:**
+-- Subir el precio de un curso
+UPDATE cursos
+SET precio = 320000
+WHERE id = 2;  -- "Modelado de datos"
 
-  - Email único, edad mínima.
-  - Modalidad válida, cupo y precio no negativos, fechas coherentes.
-  - Una inscripción por estudiante y curso.
-  - FKs mantienen la integridad entre tablas.
+-- Cambiar el estado de una inscripción
+UPDATE inscripciones
+SET estado = 'pagada'
+WHERE id = 2;
+```
 
-## Paso 10 Buenas prácticas mínimas
+**Actualizar con condiciones más elaboradas:**
 
-- Usa `BIGSERIAL` para IDs (simple y funciona).
-- Define `NOT NULL`, `UNIQUE` y `CHECK` donde tenga sentido.
-- Usa `FOREIGN KEY` para relaciones reales entre tablas.
-- Para dinero, usa `NUMERIC(10,2)`.
-- Para fechas de cursos, `DATE`. Para “momento exacto” (inscripción), `TIMESTAMP`.
+```sql
+-- Aumentar 10% el precio de todos los cursos virtuales
+UPDATE cursos
+SET precio = precio * 1.10
+WHERE modalidad = 'virtual';
+
+-- Marcar como 'cancelada' cualquier inscripción pendiente con más de 30 días
+UPDATE inscripciones
+SET estado = 'cancelada'
+WHERE estado = 'pendiente'
+  AND fecha_inscripcion < NOW() - INTERVAL '30 days';
+```
+
+**Ver qué cambiaste (útil para auditar):**
+
+```sql
+UPDATE cursos
+SET precio = precio * 0.95
+WHERE modalidad = 'presencial'
+RETURNING id, titulo, precio;
+```
+
+## Paso 9 Insertar datos en gran volumen
+
+### 9.1 Inserciones múltiples “normales”
+
+```sql
+INSERT INTO estudiantes (nombre,email,edad,ciudad) VALUES
+('Carlos Ruiz','carlos@example.com',28,'Bogotá'),
+('Marta León','marta@example.com',24,'Barranquilla'),
+('Diego Patiño','diego@example.com',31,'Cali');
+```
+
+### 9.2 Generar datos masivos con `generate_series` (rápido para practicar)
+
+```sql
+-- 100 estudiantes de prueba: est001, est002, ..., est100
+INSERT INTO estudiantes (nombre, email, edad, ciudad)
+SELECT
+  'Estudiante ' || to_char(gs, 'FM000') AS nombre,
+  'est' || to_char(gs, 'FM000') || '@example.com' AS email,
+  (14 + (gs % 30))::int AS edad,             -- entre 14 y 43
+  CASE (gs % 5)
+    WHEN 0 THEN 'Bogotá'
+    WHEN 1 THEN 'Medellín'
+    WHEN 2 THEN 'Cali'
+    WHEN 3 THEN 'Barranquilla'
+    ELSE 'Bucaramanga'
+  END AS ciudad
+FROM generate_series(1,100) AS gs;
+```
+
+```sql
+-- 20 cursos virtuales y 20 presenciales de prueba
+INSERT INTO cursos (titulo, modalidad, cupo, precio, fecha_inicio, fecha_fin)
+SELECT
+  'Curso Virtual ' || gs,
+  'virtual',
+  30 + (gs % 10),                      -- cupo variable
+  200000 + (gs * 1000),                -- precios distintos
+  DATE '2025-12-01' + (gs || ' days')::interval,
+  DATE '2025-12-10' + (gs || ' days')::interval
+FROM generate_series(1,20) AS gs;
+
+INSERT INTO cursos (titulo, modalidad, cupo, precio, fecha_inicio, fecha_fin)
+SELECT
+  'Curso Presencial ' || gs,
+  'presencial',
+  20 + (gs % 10),
+  250000 + (gs * 1000),
+  DATE '2026-01-05' + (gs || ' days')::interval,
+  DATE '2026-01-20' + (gs || ' days')::interval
+FROM generate_series(1,20) AS gs;
+```
+
+```sql
+-- Inscripciones masivas: tomar 200 combinaciones estudiante-curso válidas
+INSERT INTO inscripciones (estudiante_id, curso_id, estado)
+SELECT e.id, c.id,
+       CASE (e.id + c.id) % 3
+         WHEN 0 THEN 'pagada'
+         WHEN 1 THEN 'pendiente'
+         ELSE 'cancelada'
+       END
+FROM (SELECT id FROM estudiantes ORDER BY id LIMIT 100) e
+JOIN (SELECT id FROM cursos ORDER BY id LIMIT 20) c
+  ON (e.id + c.id) % 5 = 0         -- simple regla para no romper UNIQUE
+LIMIT 200;
+```
+
+> Nota: si alguna inserción masiva falla, revisa restricciones `UNIQUE`/`CHECK` y ajusta la lógica (por ejemplo, cambios en la condición del JOIN para evitar duplicados).
+
+## Paso 10 Limpiar campos dentro de una fila (sin borrar la fila)
+
+A veces **no quieres borrar la fila**, solo “vaciar”/normalizar algunos campos.
+
+```sql
+-- Quitar la ciudad (dejarla en NULL) a quienes no la informaron correctamente
+UPDATE estudiantes
+SET ciudad = NULL
+WHERE ciudad IN ('', 'N/A', 'Desconocido');
+
+-- Regresar el estado a su valor por defecto (usando DEFAULT)
+UPDATE inscripciones
+SET estado = DEFAULT
+WHERE estado NOT IN ('pendiente','pagada','cancelada');
+```
+
+## Paso 11 Eliminar información específica con WHERE (DELETE selectivo)
+
+**Eliminar registros “que no sean necesarios” tras haber sido insertados:**
+
+```sql
+-- Borrar inscripciones canceladas anteriores a 2025-11-01
+DELETE FROM inscripciones
+WHERE estado = 'cancelada'
+  AND fecha_inscripcion < '2025-11-01'::timestamp
+RETURNING id, estudiante_id, curso_id;
+
+-- Borrar estudiantes de prueba por patrón de email
+DELETE FROM estudiantes
+WHERE email LIKE 'est___@example.com'  -- est001, est002, etc.
+RETURNING id, email;
+```
+
+**Eliminar usando datos de otra tabla (DELETE ... USING):**
+
+```sql
+-- Borrar inscripciones de cursos cuyo cupo es 0
+DELETE FROM inscripciones i
+USING cursos c
+WHERE i.curso_id = c.id
+  AND c.cupo = 0
+RETURNING i.id, i.estudiante_id, i.curso_id;
+```
+
+**Patrón seguro (recomendado):** primero inspecciona, luego borra con la misma condición.
+
+```sql
+-- Ver qué se borraría:
+SELECT i.*
+FROM inscripciones i
+JOIN cursos c ON c.id = i.curso_id
+WHERE c.cupo = 0;
+
+-- Si está bien, ejecuta el DELETE con la misma condición
+DELETE FROM inscripciones i
+USING cursos c
+WHERE i.curso_id = c.id
+  AND c.cupo = 0;
+```
+
+## Paso 12 Eliminar una fila completa (DELETE por PK)
+
+**Importante:** en nuestro diseño, `inscripciones` depende de `estudiantes` y `cursos`.
+Para eliminar un estudiante o un curso, **primero elimina sus inscripciones** (o usa `TRUNCATE ... CASCADE` si vas a vaciar).
+
+```sql
+-- 12.1 Eliminar todas las inscripciones del estudiante 1
+DELETE FROM inscripciones
+WHERE estudiante_id = 1;
+
+-- 12.2 Ahora sí, eliminar la fila del estudiante 1
+DELETE FROM estudiantes
+WHERE id = 1;
+```
+
+**Opción alternativa (cambiar la FK a ON DELETE CASCADE):**
+
+```sql
+-- Si prefieres que al borrar un estudiante se borren sus inscripciones automáticamente:
+ALTER TABLE inscripciones
+  DROP CONSTRAINT inscripciones_estudiante_id_fkey,
+  ADD CONSTRAINT inscripciones_estudiante_id_fkey
+  FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE;
+
+-- Análogo para curso_id:
+ALTER TABLE inscripciones
+  DROP CONSTRAINT inscripciones_curso_id_fkey,
+  ADD CONSTRAINT inscripciones_curso_id_fkey
+  FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE;
+```
+
+> Con `ON DELETE CASCADE`, bastaría:
+
+```sql
+DELETE FROM estudiantes WHERE id = 1;
+```
+
+## Paso 13 Vaciar/limpiar una tabla completa (TRUNCATE vs DELETE)
+
+**Vaciar rápido (sin borrar la tabla):**
+
+```sql
+-- 13.1 Vaciar inscripciones (más rápido que DELETE)
+TRUNCATE TABLE inscripciones;
+
+-- 13.2 Si hay dependencias, usa CASCADE
+TRUNCATE TABLE inscripciones CASCADE;
+```
+
+**Vaciar selectivamente con WHERE (límpiezas parciales):**
+
+```sql
+-- Borra solo inscripciones 'pendiente'
+DELETE FROM inscripciones
+WHERE estado = 'pendiente';
+
+-- Borra inscripciones de cursos que terminaron antes de cierta fecha
+DELETE FROM inscripciones i
+USING cursos c
+WHERE i.curso_id = c.id
+  AND c.fecha_fin < DATE '2025-11-15';
+```
+
+> Regla práctica: **TRUNCATE** para vaciar todo **muy rápido**; **DELETE ... WHERE** para limpiezas selectivas.
+
+## Paso 14 Eliminar una columna (ALTER TABLE ... DROP COLUMN)
+
+Si una columna ya no es necesaria:
+
+```sql
+-- Quitar la columna 'ciudad' de estudiantes
+ALTER TABLE estudiantes
+DROP COLUMN ciudad;
+
+-- Quitar 'cupo' de cursos (ejemplo). Ojo: asegúrate de no usarla en CHECKs/consultas
+ALTER TABLE cursos
+DROP COLUMN cupo;
+```
+
+> Si existe un `CHECK` o `INDEX` que la usa, elimínalos o modifícalos antes.
+
+## Paso 15 Eliminar una tabla completa (DROP TABLE)
+
+**Orden recomendado con FKs:** primero tablas “hijas” (inscripciones), luego “padres” (cursos/estudiantes).
+
+```sql
+-- 15.1 Si solo vas a borrar la tabla hija:
+DROP TABLE inscripciones;
+
+-- 15.2 Si quieres borrar todas aunque tengan dependencias:
+-- (Cuidado: CASCADE elimina también objetos dependientes)
+DROP TABLE inscripciones CASCADE;
+DROP TABLE cursos CASCADE;
+DROP TABLE estudiantes CASCADE;
+```
+
+> Alternativa segura: si solo vas a dejar de usar la tabla, considera **TRUNCATE** o archivarla en otra base.
+
+## Paso 16 Eliminar la base de datos completa (DROP DATABASE)
+
+**No puedes borrar una base si estás dentro de ella o hay conexiones activas.**
+
+```sql
+-- 16.1 Sal del contexto de 'academia' y vuelve a 'postgres'
+\c postgres
+
+-- 16.2 (Opcional) Forzar desconexión de clientes conectados a 'academia'
+-- Requiere permisos suficientes
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = 'academia'
+  AND pid <> pg_backend_pid();
+
+-- 16.3 Ahora sí, borrar la base
+DROP DATABASE academia;
+```
+
+## Paso 17 Consejos de seguridad al modificar/borrar
+
+1. **Usa transacciones** cuando hagas cambios grandes:
+
+   ```sql
+   BEGIN;
+
+   -- tus UPDATE/DELETE/TRUNCATE aquí
+
+   -- Revisa: si todo bien
+   COMMIT;
+   -- Si no:
+   -- ROLLBACK;
+   ```
+
+2. **Vista previa antes de borrar:** ejecuta un `SELECT` con el mismo `WHERE` que usarás en el `DELETE`.
+3. **Respeta el orden por FKs:** primero `inscripciones`, luego `cursos`/`estudiantes` (a menos que uses `ON DELETE CASCADE` o `TRUNCATE ... CASCADE`).
+4. **Evita borrar columnas “calientes”:** confirma que no participen en `CHECK`, `INDEX`, vistas o consultas críticas.
+5. **Respaldos:** antes de limpiezas masivas, haz un `pg_dump` rápido.
